@@ -1,34 +1,40 @@
+
 # EEG Preprocessing Pipeline for Imagined Speech
 
-This pipeline provides a robust preprocessing solution for EEG data from imagined speech experiments, specifically designed for datasets organized by word classes.
+This repository provides a comprehensive and robust preprocessing pipeline for EEG data collected during imagined speech experiments. The pipeline is designed to handle datasets organized by word classes and supports multi-subject, multi-trial structures. It ensures high data quality through advanced filtering, artifact removal, and extensive logging.
 
-## Dataset Status ✅
+## Project Overview
 
-**PREPROCESSING COMPLETED SUCCESSFULLY**
-- **Input**: 360 EDF files in `Pilot_2/` (raw data)
-- **Output**: 360 preprocessed EDF files in `Pilot_2_Preprocessed/` (cleaned data)
-- **Success Rate**: 100% (360/360 files processed)
-- **Quality**: All subdirectories contain at least 10 files per word class
+This pipeline processes raw EEG data (EDF format) and outputs cleaned, artifact-reduced EEG files suitable for further analysis. It is tailored for research in imagined speech and related cognitive neuroscience applications.
 
-## Features
+## Dataset Example
 
-- **Comprehensive filtering**: Band-pass (0.5-32.5 Hz) and notch filtering (50 Hz + harmonics)
-- **ICA-based artifact removal**: Automatic detection of EOG, muscle, and cardiac artifacts
-- **Quality control**: Extensive validation and logging of all preprocessing steps
-- **Robust handling**: Supports different trial lengths and handles missing/corrupted files gracefully
-- **Detailed reporting**: Generates comprehensive logs and statistics
+The pipeline has been validated on datasets containing hundreds of EDF files, organized by word class. For example:
+
+- **Input Directory**: Contains raw EDF files grouped by word class (e.g., `Pilot_2/word_class/subject_trial.edf`).
+- **Output Directory**: Contains preprocessed EDF files with artifacts removed and quality control applied (e.g., `Pilot_2_Preprocessed/word_class/subject_trial_preprocessed.edf`).
+
+## Key Features
+
+- Band-pass filtering (0.5–32.5 Hz) and notch filtering (50 Hz and harmonics)
+- ICA-based artifact removal (EOG, muscle, cardiac artifacts)
+- Quality control and validation of all preprocessing steps
+- Robust handling of variable trial lengths and missing/corrupted files
+- Detailed logging and reporting for reproducibility
 
 ## Requirements
 
+Install the required Python packages:
+
 ```bash
 pip install mne numpy scipy matplotlib
-# Optional for enhanced artifact detection:
+# For enhanced artifact detection (optional):
 pip install mne-icalabel
 ```
 
 ## Usage
 
-### Basic Usage
+### Python API
 
 ```python
 from preprocessing import run_preprocessing_pipeline
@@ -40,51 +46,58 @@ results = run_preprocessing_pipeline(
 )
 ```
 
-### Direct Execution
+
+### Command Line
 
 ```bash
-python preprocessing.py
+python preprocessing.py --input_dir <input_directory> --output_dir <output_directory>
 ```
 
-## Pipeline Steps
+## Pipeline Workflow
 
-1. **Dataset Validation**: Scans input directory and validates EDF files
-2. **ICA Preparation**: Concatenates trials for robust ICA decomposition
-3. **ICA Decomposition**: Fits ICA on concatenated data
-4. **Individual Processing**: Processes each file using the fitted ICA:
-   - Band-pass filtering (0.5-32.5 Hz)
-   - Notch filtering (50 Hz + harmonics for UAE powerline)
-   - Bad channel interpolation
-   - ICA artifact removal
-   - Data export
-5. **Report Generation**: Creates comprehensive processing reports
+1. **Dataset Validation**: Scans the input directory and validates EDF files for minimum quality requirements.
+2. **ICA Preparation**: Concatenates trials to enable robust ICA decomposition (if enabled).
+3. **ICA Decomposition**: Fits ICA on concatenated data to identify artifact components (if enabled).
+4. **Individual File Processing**: Applies filtering, artifact removal, and bad channel interpolation to each file.
+5. **Reporting**: Generates logs and summary statistics for all preprocessing steps.
 
 ## Configuration
 
-Key parameters can be modified in the `PreprocessingConfig` class:
+Key parameters can be modified in the `PreprocessingConfig` class within `preprocessing.py`:
 
 ```python
 class PreprocessingConfig:
-    # Filtering
     BANDPASS_LOW = 0.5      # Hz
     BANDPASS_HIGH = 32.5    # Hz
-    NOTCH_FREQ = 50.0       # Hz (UAE powerline)
-    
-    # ICA
+    NOTCH_FREQ = 50.0       # Hz
     ICA_METHOD = 'infomax'
     ICA_N_COMPONENTS = None  # Auto-determine
-    
-    # Artifact detection thresholds
     EOG_THRESHOLD = 0.8
     MUSCLE_THRESHOLD = 0.8
     CARDIAC_THRESHOLD = 0.8
-    
-    # Quality control
     MIN_CHANNELS = 16
     MAX_BAD_CHANNELS_RATIO = 0.2
 ```
 
-## Output Structure
+## Input Directory Structure
+
+The input directory should be organized as follows:
+
+```
+input_dir/
+├── word_class_1/
+│   ├── trial1.edf
+│   ├── trial2.edf
+│   └── ...
+├── word_class_2/
+│   ├── trial1.edf
+│   └── ...
+├── ...
+```
+
+Each EDF file should meet minimum channel and duration requirements. The pipeline will scan these subdirectories, validate the files, and process them accordingly.
+
+## Output Directory Structure
 
 ```
 Pilot_2_Preprocessed/
@@ -102,71 +115,80 @@ Pilot_2_Preprocessed/
 └── preprocessing_summary.json
 ```
 
+
+## Notes
+
+- The script now requires you to specify the input and output directories using command-line arguments:
+
+    ```bash
+    python preprocessing.py --input_dir <input_directory> --output_dir <output_directory>
+    ```
+
+- You can still use the Python API as shown above for integration into other workflows.
+
+- Key configuration parameters can be changed in the `PreprocessingConfig` class in `preprocessing.py`.
+
+
 ## Logging and Quality Control
 
-The pipeline provides extensive logging:
+The pipeline provides detailed logging and reporting:
 
-- **File-level logs**: Processing status for each file
-- **Channel logs**: Removed/interpolated channels
-- **ICA logs**: Removed components and their classifications
-- **Quality metrics**: Filter effectiveness, processing times
-- **Summary statistics**: Overall preprocessing success rates
+- File-level logs: Processing status and errors for each file
+- Channel logs: Channels removed or interpolated during preprocessing
+- ICA logs: Artifact components detected and removed (if enabled)
+- Quality metrics: Filter effectiveness, processing times, and summary statistics
 
 ## Artifact Detection
 
-The pipeline uses multiple methods for artifact detection:
+Artifact detection is performed using both machine learning (ICLabel, if available) and heuristic methods:
 
-1. **ICLabel** (if available): Machine learning-based component classification
-2. **Heuristic methods**: Rule-based detection using:
-   - Topographical patterns
-   - Frequency content analysis
-   - Temporal characteristics
+- **ICLabel**: Machine learning-based component classification (optional)
+- **Heuristic methods**: Rule-based detection using topographical patterns, frequency content, and temporal characteristics
 
-### Detected Artifacts:
-- **EOG (Eye movements)**: Frontal topography + low-frequency content
-- **Muscle**: High-frequency content + temporal/peripheral topography  
-- **Cardiac**: Regular rhythmic patterns in 0.8-2.2 Hz range
-- **Line noise**: 50 Hz and harmonics
+Artifacts detected include:
+- Eye movements (EOG): Frontal topography, low-frequency content
+- Muscle: High-frequency content, peripheral topography
+- Cardiac: Rhythmic patterns in 0.8–2.2 Hz range
+- Line noise: 50 Hz and harmonics
 
 ## Data Quality Safeguards
 
-- **Bad channel detection**: Flat channels, extreme values, statistical outliers
-- **Bad channel interpolation**: Spherical spline interpolation
-- **Trial validation**: Minimum duration, sufficient channels
-- **Filter quality assessment**: Power spectral analysis before/after filtering
+- Bad channel detection: Identifies flat channels, extreme values, and statistical outliers
+- Bad channel interpolation: Uses spherical spline interpolation
+- Trial validation: Ensures minimum duration and sufficient channels
+- Filter quality assessment: Power spectral analysis before and after filtering
 
 ## Error Handling
 
-- Graceful handling of corrupted/missing files
-- Automatic fallback from ICLabel to heuristic methods
-- Comprehensive error logging with specific failure reasons
-- Partial processing support (continues with remaining files if some fail)
+- Handles corrupted or missing files gracefully
+- Falls back to heuristic artifact detection if ICLabel is unavailable
+- Logs specific failure reasons for each file
+- Supports partial processing (continues with remaining files if some fail)
 
-## Example Results
+## Expected Results
 
-After preprocessing, you can expect:
-- Removal of powerline noise (50 Hz + harmonics)
-- Clean EEG signals free from eye, muscle, and cardiac artifacts
-- Preserved neural signals in relevant frequency bands
-- Detailed logs for reproducibility and quality assessment
+After preprocessing, the output EEG data will:
+- Have powerline noise (50 Hz and harmonics) removed
+- Be free from eye, muscle, and cardiac artifacts
+- Preserve neural signals in relevant frequency bands
+- Include detailed logs for reproducibility and quality assessment
 
-## Troubleshooting
+## Troubleshooting and Performance Tips
 
-### Common Issues:
+Common issues and solutions:
 
-1. **"No valid files found"**: Check EDF file format and minimum channel requirements
-2. **"ICA failed"**: Ensure sufficient data duration (concatenated trials should be >60s)
-3. **"Too many bad channels"**: Check electrode impedances and recording quality
+1. "No valid files found": Check EDF file format and minimum channel requirements
+2. "ICA failed": Ensure sufficient data duration (concatenated trials should be >60s)
+3. "Too many bad channels": Check electrode impedances and recording quality
 
-### Performance Tips:
+Performance tips:
+- For large datasets, process subsets separately
+- Monitor memory usage for long trials
+- Use SSD storage for faster I/O
 
-- For large datasets, consider processing subsets separately
-- Monitor memory usage with many long trials
-- Use SSD storage for faster I/O with large EDF files
+## References
 
-## Citation
-
-This preprocessing pipeline follows best practices from:
+This pipeline follows best practices from:
 - MNE-Python documentation
 - Jas et al. (2018). "Autoreject: Automated artifact rejection for MEG and EEG data"
 - Pion-Tonachini et al. (2019). "ICLabel: An automated electroencephalographic independent component classifier"

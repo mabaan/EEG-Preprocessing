@@ -1,19 +1,18 @@
+
 """
 EEG Preprocessing Pipeline for Imagined Speech Task
 ==================================================
 
 This module provides a streamlined preprocessing pipeline for EEG data
 from imagined speech experiments. The pipeline includes:
-- Band-pass and notch filtering
-- DC offset removal
-- Basic quality control and logging
-- Robust handling of multi-subject, multi-class datasets
+    - Band-pass and notch filtering
+    - DC offset removal
+    - Basic quality control and logging
+    - Robust handling of multi-subject, multi-class datasets
 
 Note: ICA artifact removal and advanced quality control have been disabled.
-
-Author: EEG Preprocessing Expert
-Date: October 2025
 """
+
 
 import os
 import sys
@@ -32,12 +31,14 @@ from scipy.stats import zscore
 import mne
 from mne.preprocessing import ICA
 
+
 # Try to import ICLabel, but don't fail if not available
 try:
     from mne_icalabel import label_components
     ICALABEL_AVAILABLE = True
 except ImportError:
     ICALABEL_AVAILABLE = False
+
 
 # Suppress MNE warnings for cleaner output
 mne.set_log_level('WARNING')
@@ -47,32 +48,33 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 # CONFIGURATION PARAMETERS
 # =============================================================================
 
+
 class PreprocessingConfig:
     """Configuration parameters for EEG preprocessing pipeline."""
-    
+
     # Filtering parameters
     BANDPASS_LOW = 0.5      # Hz - High-pass filter cutoff
     BANDPASS_HIGH = 32.5    # Hz - Low-pass filter cutoff
     NOTCH_FREQ = 50.0       # Hz - Powerline frequency (UAE grid)
     NOTCH_HARMONICS = [100, 150]  # Hz - Powerline harmonics
     FILTER_METHOD = 'fir'   # Filter method ('fir' or 'iir')
-    
+
     # ICA parameters (DISABLED)
     # ICA_N_COMPONENTS = None  # Auto-determine based on data rank
     # ICA_METHOD = 'infomax'   # ICA algorithm
     # ICA_MAX_ITER = 1000     # Maximum iterations
     # ICA_RANDOM_STATE = 42   # For reproducibility
-    
+
     # Artifact detection thresholds (DISABLED)
     # EOG_THRESHOLD = 0.8     # ICLabel confidence for eye artifacts
     # MUSCLE_THRESHOLD = 0.8  # ICLabel confidence for muscle artifacts
     # CARDIAC_THRESHOLD = 0.8 # ICLabel confidence for cardiac artifacts
-    
+
     # Data quality thresholds (RELAXED)
     MIN_CHANNELS = 8        # Minimum required EEG channels (adjusted for 14-channel system)
     # MAX_BAD_CHANNELS_RATIO = 0.5  # Maximum ratio of bad channels allowed (DISABLED)
     MIN_TRIAL_DURATION = 1.0      # Minimum trial duration in seconds
-    
+
     # Output parameters
     SAVE_PREPROCESSING_REPORT = True
     # SAVE_ICA_COMPONENTS = True  # DISABLED
@@ -83,27 +85,17 @@ class PreprocessingConfig:
 # LOGGING SETUP
 # =============================================================================
 
+
 def setup_logging(output_dir: Path) -> logging.Logger:
     """
-    Setup comprehensive logging for preprocessing pipeline.
-    
-    Parameters
-    ----------
-    output_dir : Path
-        Directory to save log files
-        
-    Returns
-    -------
-    logger : logging.Logger
-        Configured logger instance
+    Set up comprehensive logging for the preprocessing pipeline.
     """
     log_dir = output_dir / 'logs'
     log_dir.mkdir(parents=True, exist_ok=True)
-    
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = log_dir / f'preprocessing_{timestamp}.log'
-    
-    # Configure logging
+
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
@@ -112,16 +104,16 @@ def setup_logging(output_dir: Path) -> logging.Logger:
             logging.StreamHandler(sys.stdout)
         ]
     )
-    
+
     logger = logging.getLogger('EEG_Preprocessing')
     logger.info(f"Logging initialized. Log file: {log_file}")
-    
     return logger
+
 
 
 class PreprocessingLogger:
     """Enhanced logging for tracking preprocessing statistics."""
-    
+
     def __init__(self, logger: logging.Logger):
         self.logger = logger
         self.stats = {
@@ -133,37 +125,30 @@ class PreprocessingLogger:
             'trials_dropped': [],
             'processing_times': {}
         }
-    
+
     def log_file_start(self, filepath: str):
-        """Log start of file processing."""
         self.logger.info(f"Processing file: {filepath}")
-    
+
     def log_file_success(self, filepath: str, processing_time: float):
-        """Log successful file processing."""
         self.stats['files_processed'] += 1
         self.stats['processing_times'][filepath] = processing_time
         self.logger.info(f"Successfully processed {filepath} in {processing_time:.2f}s")
-    
+
     def log_file_failure(self, filepath: str, error: str):
-        """Log file processing failure."""
         self.stats['files_failed'] += 1
         self.logger.error(f"Failed to process {filepath}: {error}")
-    
+
     def log_channels_removed(self, filepath: str, channels: List[str]):
-        """Log removed channels."""
         self.stats['channels_removed'][filepath] = channels
         if channels:
             self.logger.warning(f"Removed channels in {filepath}: {channels}")
-    
+
     def log_channels_interpolated(self, filepath: str, channels: List[str]):
-        """Log interpolated channels."""
         self.stats['channels_interpolated'][filepath] = channels
         if channels:
             self.logger.info(f"Interpolated channels in {filepath}: {channels}")
-    
-    def log_ica_components(self, filepath: str, removed_components: List[int], 
-                          component_labels: Dict):
-        """Log ICA component removal."""
+
+    def log_ica_components(self, filepath: str, removed_components: List[int], component_labels: Dict):
         self.stats['ica_components_removed'][filepath] = {
             'components': removed_components,
             'labels': component_labels
@@ -171,39 +156,34 @@ class PreprocessingLogger:
         self.logger.info(f"Removed ICA components in {filepath}: {removed_components}")
         for comp, label in component_labels.items():
             self.logger.info(f"  Component {comp}: {label}")
-    
+
     def log_trial_dropped(self, filepath: str, reason: str):
-        """Log dropped trial."""
         self.stats['trials_dropped'].append({'file': filepath, 'reason': reason})
         self.logger.warning(f"Dropped trial {filepath}: {reason}")
-    
+
     def save_summary(self, output_dir: Path):
-        """Save preprocessing summary to JSON file."""
         summary_file = output_dir / 'preprocessing_summary.json'
-        
+
         # Add overall statistics
+        total_files = self.stats['files_processed'] + self.stats['files_failed']
         self.stats['summary'] = {
-            'total_files': self.stats['files_processed'] + self.stats['files_failed'],
-            'success_rate': self.stats['files_processed'] / 
-                          (self.stats['files_processed'] + self.stats['files_failed']) 
-                          if (self.stats['files_processed'] + self.stats['files_failed']) > 0 else 0,
+            'total_files': total_files,
+            'success_rate': self.stats['files_processed'] / total_files if total_files > 0 else 0,
             'total_channels_removed': sum(len(ch) for ch in self.stats['channels_removed'].values()),
             'total_channels_interpolated': sum(len(ch) for ch in self.stats['channels_interpolated'].values()),
-            'total_ica_components_removed': sum(len(comp['components']) 
-                                              for comp in self.stats['ica_components_removed'].values()),
-            'average_processing_time': np.mean(list(self.stats['processing_times'].values())) 
-                                     if self.stats['processing_times'] else 0
+            'total_ica_components_removed': sum(len(comp['components']) for comp in self.stats['ica_components_removed'].values()),
+            'average_processing_time': np.mean(list(self.stats['processing_times'].values())) if self.stats['processing_times'] else 0
         }
-        
+
         with open(summary_file, 'w') as f:
             json.dump(self.stats, f, indent=2, default=str)
-        
+
         self.logger.info(f"Preprocessing summary saved to: {summary_file}")
-        
+
         # Log summary statistics
-        self.logger.info("="*60)
+        self.logger.info("=" * 60)
         self.logger.info("PREPROCESSING SUMMARY")
-        self.logger.info("="*60)
+        self.logger.info("=" * 60)
         self.logger.info(f"Files processed successfully: {self.stats['files_processed']}")
         self.logger.info(f"Files failed: {self.stats['files_failed']}")
         self.logger.info(f"Success rate: {self.stats['summary']['success_rate']:.2%}")
@@ -211,7 +191,7 @@ class PreprocessingLogger:
         self.logger.info(f"Total channels interpolated: {self.stats['summary']['total_channels_interpolated']}")
         self.logger.info(f"Total ICA components removed: {self.stats['summary']['total_ica_components_removed']}")
         self.logger.info(f"Average processing time: {self.stats['summary']['average_processing_time']:.2f}s")
-        self.logger.info("="*60)
+        self.logger.info("=" * 60)
 
 
 # =============================================================================
@@ -1375,27 +1355,34 @@ def run_preprocessing_pipeline(input_dir: Union[str, Path],
         return results
 
 
+
 def main():
     """
     Main entry point for the preprocessing pipeline.
     
     Example usage:
-    python preprocessing.py
+        python preprocessing.py --input_dir <input_directory> --output_dir <output_directory>
     """
-    # Configuration
-    input_directory = r"c:\Users\Hi\Documents\GitHub\EEG Preprocessing\Preliminary"
-    output_directory = r"c:\Users\Hi\Documents\GitHub\EEG Preprocessing\Preliminary_Preprocessed_Simplified"
-    
+    import argparse
+
+    parser = argparse.ArgumentParser(description="EEG Preprocessing Pipeline for Imagined Speech")
+    parser.add_argument('--input_dir', type=str, required=True, help='Input directory containing raw EDF files')
+    parser.add_argument('--output_dir', type=str, required=True, help='Output directory for preprocessed files')
+    args = parser.parse_args()
+
+    input_directory = args.input_dir
+    output_directory = args.output_dir
+
     # Run preprocessing
     results = run_preprocessing_pipeline(input_directory, output_directory)
-    
+
     if results['success']:
         print(f"\nPreprocessing completed successfully!")
         print(f"Processed {results['processed_files']}/{results['total_files']} files")
         print(f"Output directory: {results['output_directory']}")
     else:
         print(f"\nPreprocessing failed: {results['error']}")
-    
+
     return results
 
 
