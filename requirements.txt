@@ -1,0 +1,6 @@
+mne
+numpy 
+scipy 
+matplotlib 
+edfio 
+pandas

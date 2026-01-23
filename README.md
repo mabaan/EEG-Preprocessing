@@ -29,7 +29,7 @@ The pipeline has been validated on datasets containing hundreds of EDF files, or
 Install the required Python packages:
 
 ```bash
-pip install mne numpy scipy matplotlib edfio
+pip install mne numpy scipy matplotlib edfio pandas
 # For enhanced artifact detection (optional):
 pip install mne-icalabel
 ```
