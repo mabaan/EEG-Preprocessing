@@ -5,7 +5,9 @@ This repository provides a comprehensive and robust preprocessing pipeline for E
 
 ## Project Overview
 
-This pipeline processes raw EEG data (EDF format) and outputs cleaned, artifact-reduced EEG files suitable for further analysis. It is tailored for research in imagined speech and related cognitive neuroscience applications.
+This pipeline converts the subject folders into classification ready folder structure ready to be preprocessed.
+
+Then it processes raw EEG data (EDF format) and outputs cleaned, artifact-reduced EEG files suitable for further analysis. It is tailored for research in imagined speech and related cognitive neuroscience applications.
 
 ## Dataset Example
 
@@ -27,7 +29,7 @@ The pipeline has been validated on datasets containing hundreds of EDF files, or
 Install the required Python packages:
 
 ```bash
-pip install mne numpy scipy matplotlib
+pip install mne numpy scipy matplotlib edfio
 # For enhanced artifact detection (optional):
 pip install mne-icalabel
 ```
@@ -50,6 +52,7 @@ results = run_preprocessing_pipeline(
 ### Command Line
 
 ```bash
+python setup.py S1 S2 S3
 python preprocessing.py --input_dir <input_directory> --output_dir <output_directory>
 ```
 
